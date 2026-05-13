@@ -616,8 +616,8 @@ async function promptToPost(){
   btn.textContent = '⏳ Building post...';
 
   try{
-    const urlSection = urlContent ? `\n\nSOURCE MATERIAL FROM URL (${url}):\n${urlContent}` : '';
-    const data = await api(`A user has given this prompt for a Tempo Journal Instagram post: "${prompt}"${urlSection}\n\nFormat: ${fmt}. The post should be exactly ${slideCount} slide${slideCount===1?'':'s'}.\n\nExpand this into a full post idea. Return ONLY valid JSON:\n{"topic":"cover slide headline max 10 words","concept":"2-4 sentences with specific facts, names, context based on the prompt${urlContent?' and the source material':''}"}`, c, false);
+    const urlSection = urlContent ? `\n\nSOURCE MATERIAL FROM ${url}:\n${urlContent}` : '';
+    const data = await api(`You MUST write about exactly this topic: "${prompt}"${urlSection ? ' Use the source material below as your primary reference.' : ''}\n${urlSection}\n\nCreate a Tempo Journal Instagram post idea about "${prompt}". Do NOT change the topic. Do NOT write about anything else.\n\nReturn ONLY valid JSON:\n{"topic":"cover slide headline about ${prompt}, max 10 words","concept":"2-4 sentences of specific facts about ${prompt}${urlContent?' based on the source material above':''}"}`, c, false);
     let idea = {}; try{ idea = JSON.parse(extractText(data).replace(/```json|```/g,'').trim()); }catch{ idea = { topic: prompt, concept: '' }; }
     document.getElementById('tf').textContent = idea.topic || '';
     document.getElementById('cf').textContent = idea.concept || '';
@@ -865,7 +865,7 @@ async function genDay(type){
       : 'Full documentary arc: hook → context → chronological beats → stat summary → close.';
     const si = `Write EXACTLY ${count} slide${count===1?'':'s'}. ${styleHint} Max 20 words per slide. Return EXACTLY ${count} items in the array — no more, no less.`;
     try{
-      const data = await api(`Carousel slides for Tempo Journal.\nHeadline: ${topic}\nContext: ${concept}\n${si}\nReturn ONLY a JSON array with exactly ${count} strings:\n["slide 1","slide 2",...]`, pCtx);
+      const data = await api(`Write EXACTLY ${count} carousel slide${count===1?'':'s'} for a Tempo Journal Instagram post about: "${topic}"\n\nContext: ${concept}\n\n${styleHint}\nMax 20 words per slide. Every slide MUST be about "${topic}" — do not drift to other topics.\nReturn ONLY a JSON array with exactly ${count} strings:\n["slide 1","slide 2",...]`, pCtx);
       let slides = []; try{ slides = JSON.parse(extractText(data).replace(/```json|```/g,'').trim()); }catch{ slides = [topic]; }
       // Enforce exact count
       while(slides.length < count) slides.push(slides[slides.length-1] || topic);
