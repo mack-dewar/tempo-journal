@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tempo Journal — Content Generator</title>
+<script src="https://apis.google.com/js/api.js"></script>
+<script src="https://accounts.google.com/gsi/client"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f3; color: #1a1a1a; min-height: 100vh; }
+.wrap { max-width: 980px; margin: 0 auto; padding: 2rem 1.5rem; }
+h1 { font-size: 22px; font-weight: 700; margin-bottom: 2px; }
+.sub { font-size: 13px; color: #666; margin-bottom: 1.5rem; }
+.card { background: #fff; border: 1px solid #e5e5e3; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; }
+.field { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 140px; }
+.field label { font-size: 12px; color: #555; font-weight: 600; }
+.field input, .field textarea, .field select { font-size: 13px; padding: 8px 10px; border-radius: 8px; border: 1px solid #ddd; background: #fafafa; color: #1a1a1a; width: 100%; font-family: inherit; }
+.field textarea { resize: vertical; line-height: 1.5; }
+.field input:focus, .field textarea:focus { outline: none; border-color: #888; background: #fff; }
+.btn { padding: 8px 16px; border-radius: 8px; border: 1px solid #ddd; background: #fff; color: #1a1a1a; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.15s; font-family: inherit; white-space: nowrap; }
+.btn:hover { background: #f5f5f3; }
+.btn.primary { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+.btn.primary:hover { background: #333; }
+.btn.green { background: #16a34a; color: #fff; border-color: #16a34a; }
+.btn.green:hover { background: #15803d; }
+.btn.blue { background: #1d4ed8; color: #fff; border-color: #1d4ed8; }
+.btn.blue:hover { background: #1e40af; }
+.btn.small { padding: 5px 10px; font-size: 12px; }
+.btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+/* SHEETS STATUS BAR */
+.sheets-bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; margin-bottom: 1rem; font-size: 13px; }
+.sheets-bar.disconnected { background: #fafafa; border-color: #e5e5e3; }
+.sheets-dot { width: 8px; height: 8px; border-radius: 50%; background: #16a34a; flex-shrink: 0; }
+.sheets-dot.off { background: #d1d5db; }
+.sheets-info { flex: 1; color: #166534; }
+.sheets-info.off { color: #888; }
+
+/* SECTION TABS */
+.section-tabs { display: flex; gap: 0; border-bottom: 2px solid #e5e5e3; margin-bottom: 14px; }
+.section-tab { padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; border-bottom: 3px solid transparent; color: #888; margin-bottom: -2px; background: none; border-top: none; border-left: none; border-right: none; font-family: inherit; transition: all 0.15s; }
+.section-tab:hover { color: #1a1a1a; }
+.section-tab.on { color: #1a1a1a; border-bottom-color: #1a1a1a; }
+.section-page { display: none; }
+.section-page.on { display: block; }
+
+/* PILLARS */
+.pillars-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 5px; margin-top: 4px; }
+.chip { background: #f5f5f3; border: 1px solid #e5e5e3; border-radius: 8px; padding: 5px 8px; font-size: 12px; cursor: pointer; text-align: center; transition: all 0.15s; user-select: none; }
+.chip.on { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+
+/* CALENDAR */
+.legend { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.li { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #666; }
+.ldot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.top-controls { display: flex; gap: 8px; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
+.month-nav { display: flex; align-items: center; gap: 8px; }
+.month-label { font-size: 14px; font-weight: 700; min-width: 140px; text-align: center; }
+.cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 5px; margin-bottom: 1rem; }
+.dh { text-align: center; font-size: 11px; font-weight: 700; color: #999; padding: 6px 0; }
+.dc { background: #fff; border: 1px solid #e5e5e3; border-radius: 8px; padding: 7px; min-height: 76px; cursor: pointer; transition: all 0.15s; position: relative; }
+.dc:hover { border-color: #aaa; }
+.dc.empty { background: transparent; border-color: transparent; cursor: default; pointer-events: none; }
+.dc.has { border-color: #ccc; }
+.dc.sel { border: 2px solid #1a1a1a; }
+.dc.today { background: #fffbeb; border-color: #fbbf24; }
+.dc.drag-over { background: #eff6ff; border: 2px dashed #3b82f6; }
+.dc.dragging { opacity: 0.4; }
+.dn { font-size: 11px; font-weight: 700; color: #999; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between; }
+.drag-handle { font-size: 10px; color: #ccc; cursor: grab; display: none; }
+.dc.has .drag-handle { display: block; }
+.pill { font-size: 10px; padding: 2px 5px; border-radius: 8px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 2px; }
+.pill.ready { background: #dcfce7; color: #166534; }
+.pill.draft { background: #f0f0f0; color: #555; }
+.pill.breaking { background: #fee2e2; color: #991b1b; }
+.pill.narrative { background: #ede9fe; color: #5b21b6; }
+.pill.gear { background: #d1fae5; color: #065f46; }
+.pill.feature { background: #ffedd5; color: #9a3412; }
+.pill.embargo { background: #fefce8; color: #854d0e; }
+.pill.story { background: #dbeafe; color: #1e40af; }
+.prog-bar { height: 4px; background: #f0f0f0; border-radius: 2px; margin-bottom: 8px; overflow: hidden; }
+.prog-fill { height: 100%; background: #1a1a1a; border-radius: 2px; transition: width 0.3s; }
+.gen-status { font-size: 12px; color: #888; margin-bottom: 6px; min-height: 16px; }
+
+/* POST PANEL */
+.detail { background: #fff; border: 1px solid #e5e5e3; border-radius: 12px; padding: 1.25rem; margin-top: 1rem; }
+.ph { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; }
+.pt { font-size: 15px; font-weight: 700; }
+.ps { font-size: 12px; color: #888; margin-top: 2px; }
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid #e5e5e3; margin-bottom: 1rem; flex-wrap: wrap; }
+.tab { padding: 6px 14px; font-size: 13px; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; color: #888; margin-bottom: -1px; background: none; border-top: none; border-left: none; border-right: none; font-family: inherit; }
+.tab.on { color: #1a1a1a; border-bottom-color: #1a1a1a; }
+.fmt-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 6px; margin-bottom: 12px; }
+@media(min-width:600px){ .fmt-grid { grid-template-columns: repeat(4,1fr); } }
+.fmt-btn { padding: 8px 10px; border-radius: 8px; border: 1px solid #ddd; background: #f5f5f3; color: #555; font-size: 12px; cursor: pointer; text-align: left; display: flex; align-items: flex-start; gap: 7px; font-family: inherit; transition: all 0.15s; }
+.fmt-btn.on { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+.fmt-btn.on .fdot { background: rgba(255,255,255,0.3) !important; }
+.fdot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 3px; }
+.ft { font-weight: 700; font-size: 12px; display: block; margin-bottom: 2px; }
+.fd { font-size: 10px; opacity: 0.65; display: block; line-height: 1.4; }
+.sl { font-size: 12px; font-weight: 700; color: #888; margin-bottom: 6px; margin-top: 14px; }
+.sl:first-of-type { margin-top: 0; }
+.cb { background: #fafafa; border: 1px solid #e5e5e3; border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.6; color: #1a1a1a; white-space: pre-wrap; min-height: 36px; font-family: inherit; outline: none; }
+.cb:focus { border-color: #888; }
+.sr { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #f0f0f0; }
+.sr:last-child { border-bottom: none; }
+.sb { font-size: 10px; font-weight: 700; color: #888; background: #f5f5f3; border-radius: 6px; padding: 2px 7px; flex-shrink: 0; margin-top: 2px; min-width: 52px; text-align: center; white-space: nowrap; }
+.st { font-size: 13px; line-height: 1.5; color: #1a1a1a; flex: 1; }
+.ar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.sbadge { font-size: 11px; padding: 3px 8px; border-radius: 10px; font-weight: 600; }
+.sbadge.idea { background: #f0f0f0; color: #555; }
+.sbadge.draft { background: #dbeafe; color: #1e40af; }
+.sbadge.ready { background: #dcfce7; color: #166534; }
+.sbadge.embargo { background: #fefce8; color: #854d0e; }
+.loading { display: flex; align-items: center; gap: 8px; color: #888; font-size: 13px; padding: 10px 0; }
+.dots span { width: 5px; height: 5px; border-radius: 50%; background: #888; animation: bop 1.2s ease-in-out infinite; display: inline-block; margin: 0 2px; }
+.dots span:nth-child(2) { animation-delay: 0.2s; }
+.dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bop { 0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)} }
+.es { text-align: center; padding: 1.5rem; color: #aaa; font-size: 13px; }
+.divider { border: none; border-top: 1px solid #f0f0f0; margin: 14px 0; }
+.err { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 10px 12px; font-size: 13px; color: #dc2626; margin-top: 8px; }
+.img-card { background: #f5f5f3; border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+.img-lbl { font-size: 10px; font-weight: 700; color: #888; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+.img-row { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 6px; }
+.badge { font-size: 10px; padding: 2px 7px; border-radius: 10px; flex-shrink: 0; white-space: nowrap; font-weight: 600; }
+.b-getty { background: #dbeafe; color: #1e40af; }
+.b-ap { background: #fee2e2; color: #991b1b; }
+.b-brand { background: #d1fae5; color: #065f46; }
+.b-race { background: #ffedd5; color: #9a3412; }
+.b-unsplash { background: #ede9fe; color: #5b21b6; }
+.b-athlete { background: #dcfce7; color: #166534; }
+.img-search { font-size: 12px; color: #1a1a1a; flex: 1; line-height: 1.4; }
+.img-credit { font-size: 11px; color: #666; margin-top: 4px; font-style: italic; background: #fff; border-radius: 6px; padding: 5px 8px; }
+.img-tip { font-size: 11px; color: #888; margin-top: 6px; padding-top: 6px; border-top: 1px solid #e5e5e3; line-height: 1.5; }
+.src-legend { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.src-li { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #666; }
+.source-card { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+.source-title { font-size: 12px; font-weight: 700; color: #0369a1; margin-bottom: 4px; }
+.source-url a { font-size: 11px; color: #0284c7; text-decoration: none; word-break: break-all; }
+.source-url a:hover { text-decoration: underline; }
+.source-snippet { font-size: 12px; color: #555; margin-top: 4px; line-height: 1.5; }
+.source-note { background: #fefce8; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 12px; font-size: 12px; color: #854d0e; margin-bottom: 10px; }
+.api-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+.api-box p { font-size: 12px; color: #92400e; margin-bottom: 8px; line-height: 1.5; }
+.api-box a { color: #92400e; }
+.api-box-purple { background: #f5f3ff; border: 1px solid #c4b5fd; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+.api-box-purple p { font-size: 12px; color: #5b21b6; margin-bottom: 8px; line-height: 1.5; }
+.sync-log { font-size: 11px; color: #888; margin-top: 6px; min-height: 16px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Tempo Journal</h1>
+  <p class="sub">Running news publication · Instagram content generator</p>
+
+  <!-- GOOGLE SHEETS STATUS BAR -->
+  <div class="sheets-bar disconnected" id="sheetsBar">
+    <div class="sheets-dot off" id="sheetsDot"></div>
+    <div class="sheets-info off" id="sheetsInfo">Not connected to Google Sheets</div>
+    <button class="btn small blue" id="sheetsConnectBtn" onclick="connectSheets()">Connect Google Sheets</button>
+    <button class="btn small" id="sheetsSyncBtn" onclick="syncToSheets()" style="display:none;">⟳ Sync now</button>
+    <button class="btn small" id="sheetsDisconnectBtn" onclick="disconnectSheets()" style="display:none;">Disconnect</button>
+  </div>
+  <div class="sync-log" id="syncLog"></div>
+
+  <!-- SETUP -->
+  <div class="card">
+    <div class="api-box">
+      <p><strong>Anthropic API key</strong> — needed to generate content. Get one free at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> (~$0.50/month).</p>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="password" id="apiKey" placeholder="sk-ant-..." style="flex:1;"/>
+        <button class="btn small" onclick="saveKey()">Save key</button>
+      </div>
+      <div id="keyStatus" style="font-size:12px;margin-top:6px;color:#888;"></div>
+    </div>
+    <div class="api-box-purple">
+      <p><strong>🎨 Canva integration</strong> — auto-create carousels. Get a token at <a href="https://www.canva.com/developers" target="_blank">canva.com/developers</a>.</p>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="password" id="canvaKey" placeholder="Canva API token..." style="flex:1;"/>
+        <button class="btn small" onclick="saveCanvaKey()">Save</button>
+      </div>
+      <div id="canvaKeyStatus" style="font-size:12px;margin-top:6px;color:#888;"></div>
+    </div>
+    <div class="row">
+      <div class="field" style="flex:2;min-width:200px;">
+        <label>Extra voice notes (optional)</label>
+        <textarea id="bv" style="min-height:56px;" placeholder="Paste additional caption examples to tune the AI's tone..."></textarea>
+      </div>
+      <div class="field" style="flex:1;min-width:160px;">
+        <label>Content categories</label>
+        <div class="pillars-grid">
+          <div class="chip on" data-p="Race results & records">Race results</div>
+          <div class="chip on" data-p="Athlete news & signings">Athlete news</div>
+          <div class="chip on" data-p="Race previews & fields">Race previews</div>
+          <div class="chip on" data-p="World records & milestones">Records</div>
+          <div class="chip on" data-p="Athlete career retrospectives">Retrospectives</div>
+          <div class="chip on" data-p="Shoe & gear releases">Gear & shoes</div>
+          <div class="chip on" data-p="Brand launches & kit features">Brand launches</div>
+          <div class="chip on" data-p="Running culture & moments">Running culture</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CALENDAR — always visible -->
+  <div class="card">
+    <div class="legend">
+      <div class="li"><div class="ldot" style="background:#D85A30"></div>Breaking</div>
+      <div class="li"><div class="ldot" style="background:#7F77DD"></div>Narrative</div>
+      <div class="li"><div class="ldot" style="background:#1D9E75"></div>Gear</div>
+      <div class="li"><div class="ldot" style="background:#BA7517"></div>Brand feature</div>
+      <div class="li"><div class="ldot" style="background:#1e40af"></div>Story input</div>
+      <div class="li"><div class="ldot" style="background:#166534"></div>Ready</div>
+      <div class="li" style="margin-left:auto;font-size:11px;color:#aaa;">Drag posts to reschedule</div>
+    </div>
+    <div class="top-controls">
+      <div class="month-nav">
+        <button class="btn small" onclick="prevM()">←</button>
+        <span class="month-label" id="ml"></span>
+        <button class="btn small" onclick="nextM()">→</button>
+      </div>
+      <button class="btn small" id="gaBtn" onclick="genAll()">✨ Generate ideas for month</button>
+      <button class="btn small" onclick="expCsv()">⬇ Export CSV</button>
+      <span id="prog" style="font-size:12px;color:#888;margin-left:auto;"></span>
+    </div>
+    <div id="genProg" style="display:none;">
+      <div class="gen-status" id="genStat"></div>
+      <div class="prog-bar"><div class="prog-fill" id="pf" style="width:0%"></div></div>
+    </div>
+    <div class="cal-grid" id="cg"></div>
+    <p style="font-size:12px;color:#bbb;text-align:center;padding-top:4px;">Click any day to add · Drag to reschedule</p>
+  </div>
+
+  <!-- POST DETAIL PANEL -->
+  <div id="dp" style="display:none;" class="detail">
+    <div class="ph">
+      <div><div class="pt" id="dpt"></div><div class="ps">Instagram carousel</div></div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <span class="sbadge idea" id="sbadge">idea</span>
+        <button class="btn small" onclick="closeP()">✕</button>
+      </div>
+    </div>
+
+    <div class="section-tabs">
+      <button class="section-tab on" onclick="showMode('generate')" id="modeGenerate">✨ Generate idea</button>
+      <button class="section-tab" onclick="showMode('story')" id="modeStory">📝 Story input</button>
+      <button class="section-tab" onclick="showMode('brand')" id="modeBrand">📦 Brand intake</button>
+    </div>
+
+    <!-- GENERATE MODE -->
+    <div id="modeGeneratePanel">
+      <div class="sl" style="margin-top:0;">Post format</div>
+      <div class="fmt-grid">
+        <div class="fmt-btn on" data-f="breaking" onclick="setFmt('breaking')"><div class="fdot" style="background:#D85A30"></div><div><span class="ft">Breaking news</span><span class="fd">6-8 slides · facts</span></div></div>
+        <div class="fmt-btn" data-f="narrative" onclick="setFmt('narrative')"><div class="fdot" style="background:#7F77DD"></div><div><span class="ft">Narrative deep-dive</span><span class="fd">15-20 slides · story</span></div></div>
+        <div class="fmt-btn" data-f="gear" onclick="setFmt('gear')"><div class="fdot" style="background:#1D9E75"></div><div><span class="ft">Gear roundup</span><span class="fd">8-12 slides · list</span></div></div>
+        <div class="fmt-btn" data-f="feature" onclick="setFmt('feature')"><div class="fdot" style="background:#BA7517"></div><div><span class="ft">Brand feature</span><span class="fd">6-8 slides · launch</span></div></div>
+      </div>
+      <div class="tabs">
+        <button class="tab on" onclick="swTab(0)">Story idea</button>
+        <button class="tab" onclick="swTab(1)">Carousel slides</button>
+        <button class="tab" onclick="swTab(2)">Caption</button>
+        <button class="tab" onclick="swTab(3)">🖼 Image sourcing</button>
+        <button class="tab" onclick="swTab(4)">🔗 Sources</button>
+      </div>
+      <div id="t0">
+        <div class="sl">Headline / hook</div>
+        <div contenteditable="true" class="cb" id="tf" style="min-height:36px;"></div>
+        <div class="sl">Story context & key facts</div>
+        <div contenteditable="true" class="cb" id="cf" style="min-height:56px;"></div>
+        <div class="ar">
+          <button class="btn" onclick="genDay('idea')">🪄 New idea</button>
+          <button class="btn primary" onclick="genDay('all')">✨ Generate full post</button>
+        </div>
+      </div>
+      <div id="t1" style="display:none;">
+        <div id="cc"><div class="es">Generate a story idea first</div></div>
+        <div class="ar" id="ca" style="display:none;">
+          <button class="btn" onclick="genDay('carousel')">🪄 Regenerate</button>
+          <button class="btn" onclick="cpText('carousel')">📋 Copy slides</button>
+          <button class="btn" style="background:#7c3aed;color:#fff;border-color:#7c3aed;" onclick="createInCanva()">🎨 Canva</button>
+        </div>
+      </div>
+      <div id="t2" style="display:none;">
+        <div id="cap"><div class="es">Generate a story idea first</div></div>
+        <div class="ar" id="capa" style="display:none;">
+          <button class="btn" onclick="genDay('caption')">🪄 Regenerate</button>
+          <button class="btn" onclick="cpText('caption')">📋 Copy caption</button>
+        </div>
+      </div>
+      <div id="t3" style="display:none;">
+        <div class="src-legend">
+          <div class="src-li"><span class="badge b-getty">Getty</span>Paid</div>
+          <div class="src-li"><span class="badge b-ap">AP/Reuters</span>Paid</div>
+          <div class="src-li"><span class="badge b-brand">Brand PR</span>Free</div>
+          <div class="src-li"><span class="badge b-race">Race org</span>Free</div>
+          <div class="src-li"><span class="badge b-unsplash">Unsplash</span>Free</div>
+          <div class="src-li"><span class="badge b-athlete">Athlete</span>DM</div>
+        </div>
+        <div id="imgContent"><div class="es">Generate a story idea first</div></div>
+        <div class="ar" id="imgA" style="display:none;">
+          <button class="btn" onclick="genDay('images')">🪄 Regenerate</button>
+          <button class="btn" onclick="cpText('images')">📋 Copy credits</button>
+        </div>
+      </div>
+      <div id="t4" style="display:none;">
+        <div class="source-note">🔍 Single-post generation uses web search for real sources. Bulk generation uses AI training data — click "New idea" on any day to get verified sources.</div>
+        <div id="sourcesContent"><div class="es">Generate a story idea to see sources</div></div>
+      </div>
+    </div>
+
+    <!-- STORY INPUT MODE -->
+    <div id="modeStoryPanel" style="display:none;">
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 12px;font-size:12px;color:#1e40af;margin-bottom:12px;">📝 Paste your own reporting — notes, quotes, facts — and we'll turn it into a Tempo Journal post without inventing anything.</div>
+      <div class="row" style="margin-bottom:10px;">
+        <div class="field" style="flex:2;min-width:200px;">
+          <label>Your story notes, facts & quotes</label>
+          <textarea id="storyNotes" style="min-height:120px;" placeholder="Paste your reporting here — interview quotes, race results, facts you've gathered..."></textarea>
+        </div>
+        <div class="field" style="flex:1;min-width:160px;">
+          <label>Story angle / headline</label>
+          <input type="text" id="storyHeadline" placeholder="What's the story in one line?" />
+          <label style="margin-top:10px;">Format</label>
+          <select id="storyFmt">
+            <option value="breaking">Breaking news</option>
+            <option value="narrative">Narrative deep-dive</option>
+            <option value="gear">Gear roundup</option>
+            <option value="feature">Brand feature</option>
+          </select>
+        </div>
+      </div>
+      <div class="ar">
+        <button class="btn primary" onclick="processStoryInput()">✨ Turn my notes into a post</button>
+      </div>
+      <div id="storyOutput" style="display:none;margin-top:14px;">
+        <hr class="divider">
+        <div class="sl">Carousel slides</div>
+        <div id="storySlides"></div>
+        <div class="ar" style="margin-bottom:12px;">
+          <button class="btn small" onclick="cpStory('slides')">📋 Copy slides</button>
+          <button class="btn small green" onclick="addStoryToDay()">📅 Save to this day</button>
+        </div>
+        <div class="sl">Caption</div>
+        <div id="storyCaption" class="cb" contenteditable="true" style="min-height:70px;"></div>
+        <div class="ar"><button class="btn small" onclick="cpStory('caption')">📋 Copy caption</button></div>
+      </div>
+    </div>
+
+    <!-- BRAND INTAKE MODE -->
+    <div id="modeBrandPanel" style="display:none;">
+      <div style="background:#f5f3ff;border:1px solid #c4b5fd;border-radius:8px;padding:10px 12px;font-size:12px;color:#5b21b6;margin-bottom:12px;">📦 Paste a brand press release and we'll generate a Tempo Journal post from it automatically.</div>
+      <div class="row" style="margin-bottom:10px;">
+        <div class="field" style="flex:2;min-width:200px;">
+          <label>Press release / brand brief</label>
+          <textarea id="prText" style="min-height:120px;" placeholder="Paste the full press release here..."></textarea>
+        </div>
+        <div class="field" style="flex:1;min-width:160px;">
+          <label>Brand Instagram handle</label>
+          <input type="text" id="brandHandle" placeholder="e.g. @pumarunning" />
+          <label style="margin-top:10px;">Embargo date (if applicable)</label>
+          <input type="date" id="embargoDate" />
+        </div>
+      </div>
+      <div class="ar">
+        <button class="btn primary" onclick="processBrandIntake()">✨ Generate from press release</button>
+      </div>
+      <div id="brandOutput" style="display:none;margin-top:14px;">
+        <hr class="divider">
+        <div class="sl">Carousel slides</div>
+        <div id="brandSlides"></div>
+        <div class="ar" style="margin-bottom:12px;">
+          <button class="btn small" onclick="cpBrand('slides')">📋 Copy slides</button>
+          <button class="btn small green" onclick="addBrandToDay()">📅 Save to this day</button>
+        </div>
+        <div class="sl">Caption</div>
+        <div id="brandCaption" class="cb" contenteditable="true" style="min-height:70px;"></div>
+        <div class="ar"><button class="btn small" onclick="cpBrand('caption')">📋 Copy caption</button></div>
+        <div id="brandEmbargoNote"></div>
+      </div>
+    </div>
+
+    <hr class="divider">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn small" onclick="mStat('ready')">✓ Mark ready</button>
+      <button class="btn small" onclick="mStat('draft')">✏ Mark draft</button>
+      <button class="btn small" onclick="clrDay()">🗑 Clear day</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────────
+const GOOGLE_CLIENT_ID = '1006878145981-g01ledgtidl3st04rimq60slij6905mv.apps.googleusercontent.com';
+const SHEETS_SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file';
+const CANVA_TEMPLATE_ID = 'DAHJdLykgNE';
+const SHEET_NAME = 'Tempo Journal Calendar';
+
+// ── STATE ─────────────────────────────────────────────────────
+const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+let posts = {}, sel = null, curM, curY, selFmt = 'breaking', cancelled = false;
+let API_KEY = localStorage.getItem('tj_api_key') || '';
+let CANVA_KEY = localStorage.getItem('tj_canva_key') || '';
+let storyResult = {}, brandResult = {};
+let googleToken = null, spreadsheetId = localStorage.getItem('tj_sheet_id') || null;
+let dragKey = null;
+
+// ── INIT ──────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  if(API_KEY){ document.getElementById('apiKey').value = API_KEY; setKS('✓ Key loaded', true); }
+  if(CANVA_KEY){ document.getElementById('canvaKey').value = CANVA_KEY; document.getElementById('canvaKeyStatus').textContent = '✓ Loaded'; document.getElementById('canvaKeyStatus').style.color = '#16a34a'; }
+  document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => c.classList.toggle('on')));
+  const now = new Date(); curM = now.getMonth(); curY = now.getFullYear();
+
+  // Load posts from localStorage as fallback
+  const saved = localStorage.getItem('tj_posts_data');
+  if(saved){ try{ posts = JSON.parse(saved); }catch(e){} }
+
+  renderCal();
+
+  // Auto-reconnect Google if we have a sheet ID stored
+  if(spreadsheetId){
+    initGoogleClient().then(() => {
+      setSheetsStatus('Reconnecting...', false);
+    });
+  }
+});
+
+function saveKey(){ API_KEY = document.getElementById('apiKey').value.trim(); localStorage.setItem('tj_api_key', API_KEY); setKS('✓ Key saved', true); }
+function saveCanvaKey(){ CANVA_KEY = document.getElementById('canvaKey').value.trim(); localStorage.setItem('tj_canva_key', CANVA_KEY); document.getElementById('canvaKeyStatus').textContent = '✓ Saved'; document.getElementById('canvaKeyStatus').style.color = '#16a34a'; }
+function setKS(m, ok){ const el = document.getElementById('keyStatus'); el.textContent = m; el.style.color = ok ? '#16a34a' : '#888'; }
+function setSyncLog(m){ document.getElementById('syncLog').textContent = m; }
+
+function dk(d){ return d.toISOString().split('T')[0]; }
+function pillars(){ return [...document.querySelectorAll('.chip.on')].map(c => c.dataset.p).join(', '); }
+
+// ── GOOGLE SHEETS ─────────────────────────────────────────────
+async function initGoogleClient(){
+  return new Promise((resolve) => {
+    gapi.load('client', async () => {
+      await gapi.client.init({
+        discoveryDocs: ['https://sheets.googleapis.com/$discovery/rest?version=v4']
+      });
+      resolve();
+    });
+  });
+}
+
+function connectSheets(){
+  if(typeof google === 'undefined'){ alert('Google Sign-In not loaded. Check your internet connection.'); return; }
+  setSheetsStatus('Connecting...', false);
+
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: SHEETS_SCOPES,
+    callback: async (response) => {
+      if(response.error){ setSheetsStatus('Connection failed: ' + response.error, false); return; }
+      googleToken = response.access_token;
+      gapi.client.setToken({ access_token: googleToken });
+      await initGoogleClient();
+
+      // Find or create the sheet
+      if(spreadsheetId){
+        await loadFromSheets();
+      } else {
+        await createSheet();
+      }
+    }
+  });
+  client.requestAccessToken();
+}
+
+async function createSheet(){
+  setSyncLog('Creating Google Sheet...');
+  try{
+    const response = await gapi.client.sheets.spreadsheets.create({
+      properties: { title: SHEET_NAME },
+      sheets: [{
+        properties: { title: 'Calendar' },
+        data: [{
+          rowData: [{
+            values: ['Date','Format','Headline','Concept','Status','Carousel Slides','Caption','Sources','Image Credits','Created'].map(h => ({
+              userEnteredValue: { stringValue: h },
+              userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.1, green: 0.1, blue: 0.1 } }
+            }))
+          }]
+        }]
+      }]
+    });
+    spreadsheetId = response.result.spreadsheetId;
+    localStorage.setItem('tj_sheet_id', spreadsheetId);
+    setSheetsStatus('Connected — ' + SHEET_NAME, true);
+    setSyncLog('✓ New Google Sheet created. Syncing data...');
+    await syncToSheets();
+  }catch(e){
+    setSheetsStatus('Failed to create sheet', false);
+    setSyncLog('Error: ' + e.message);
+  }
+}
+
+async function loadFromSheets(){
+  setSyncLog('Loading from Google Sheets...');
+  try{
+    const response = await gapi.client.sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: 'Calendar!A2:J1000'
+    });
+    const rows = response.result.values || [];
+    posts = {};
+    rows.forEach(row => {
+      if(!row[0]) return;
+      const date = row[0];
+      posts[date] = {
+        format: row[1] || 'breaking',
+        topic: row[2] || '',
+        concept: row[3] || '',
+        status: row[4] || 'idea',
+        carousel: row[5] ? row[5].split('|||') : [],
+        caption: row[6] || '',
+        sources: row[7] ? JSON.parse(row[7]) : [],
+        images: row[8] ? JSON.parse(row[8]) : []
+      };
+    });
+    savePosts();
+    setSheetsStatus('Connected — ' + SHEET_NAME, true);
+    setSyncLog('✓ Loaded ' + Object.keys(posts).length + ' posts from Google Sheets');
+    renderCal();
+  }catch(e){
+    // Sheet might be new/empty
+    setSheetsStatus('Connected — ' + SHEET_NAME, true);
+    setSyncLog('Connected. Sheet is empty — add content to sync.');
+    showSheetsConnected();
+  }
+}
+
+async function syncToSheets(){
+  if(!googleToken || !spreadsheetId){ alert('Connect to Google Sheets first.'); return; }
+  setSyncLog('Syncing to Google Sheets...');
+  try{
+    // Clear existing data (keep header)
+    await gapi.client.sheets.spreadsheets.values.clear({
+      spreadsheetId,
+      range: 'Calendar!A2:J1000'
+    });
+
+    const values = Object.entries(posts).sort().map(([date, post]) => [
+      date,
+      post.format || '',
+      post.topic || '',
+      post.concept || '',
+      post.status || '',
+      (post.carousel || []).join('|||'),
+      post.caption || '',
+      JSON.stringify(post.sources || []),
+      JSON.stringify(post.images || []),
+      new Date().toISOString()
+    ]);
+
+    if(values.length > 0){
+      await gapi.client.sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: 'Calendar!A2',
+        valueInputOption: 'RAW',
+        resource: { values }
+      });
+    }
+    setSyncLog('✓ Synced ' + values.length + ' posts to Google Sheets · ' + new Date().toLocaleTimeString());
+  }catch(e){
+    setSyncLog('Sync error: ' + e.message);
+  }
+}
+
+function setSheetsStatus(msg, connected){
+  document.getElementById('sheetsInfo').textContent = msg;
+  document.getElementById('sheetsInfo').className = 'sheets-info' + (connected ? '' : ' off');
+  document.getElementById('sheetsDot').className = 'sheets-dot' + (connected ? '' : ' off');
+  document.getElementById('sheetsBar').className = 'sheets-bar' + (connected ? '' : ' disconnected');
+  if(connected) showSheetsConnected();
+}
+
+function showSheetsConnected(){
+  document.getElementById('sheetsConnectBtn').style.display = 'none';
+  document.getElementById('sheetsSyncBtn').style.display = 'inline-flex';
+  document.getElementById('sheetsDisconnectBtn').style.display = 'inline-flex';
+}
+
+function disconnectSheets(){
+  googleToken = null; spreadsheetId = null;
+  localStorage.removeItem('tj_sheet_id');
+  setSheetsStatus('Not connected to Google Sheets', false);
+  document.getElementById('sheetsConnectBtn').style.display = 'inline-flex';
+  document.getElementById('sheetsSyncBtn').style.display = 'none';
+  document.getElementById('sheetsDisconnectBtn').style.display = 'none';
+  setSyncLog('Disconnected from Google Sheets. Data still saved locally.');
+}
+
+// Auto-sync after every post update
+function savePosts(){
+  localStorage.setItem('tj_posts_data', JSON.stringify(posts));
+  if(googleToken && spreadsheetId){
+    syncToSheets();
+  }
+}
+
+// ── FORMAT & MODE ─────────────────────────────────────────────
+function setFmt(f){
+  selFmt = f;
+  document.querySelectorAll('.fmt-btn').forEach(b => b.classList.toggle('on', b.dataset.f === f));
+  if(sel && posts[sel]) posts[sel].format = f;
+}
+
+function showMode(m){
+  ['generate','story','brand'].forEach(x => {
+    document.getElementById('mode' + x[0].toUpperCase() + x.slice(1) + 'Panel').style.display = x === m ? 'block' : 'none';
+    document.getElementById('mode' + x[0].toUpperCase() + x.slice(1)).classList.toggle('on', x === m);
+  });
+}
+
+// ── BRAND CONTEXT ─────────────────────────────────────────────
+function brandCtx(fmt){
+  const extra = document.getElementById('bv').value.trim();
+  const p = pillars();
+  const base = `You are the content writer for Tempo Journal, a running news publication on Instagram.
+VOICE: Written by runners for runners. Authoritative sports journalism. Occasional first-person. Punchy closers. Hyper-specific: exact dates, names, times. Max 20 words per slide. Never: journey, grind, crushing it, motivational fluff. 3-5 hashtags max.
+CAPTION EXAMPLES:
+1. "Missed out on the 2025 Sydney Marathon ballot? (We did!) More than 123,000 runners entered, a 56% increase. Chasing that seventh star just got a little bit harder."
+2. "What's next for the greatest marathoner of all time? After back-to-back in Sydney and New York, parting ways with COROS, it feels like Kipchoge is stepping into a new chapter."
+Categories: ${p}${extra ? '\nExtra: ' + extra : ''}`;
+  if(fmt==='breaking') return base+'\nFORMAT BREAKING (6-8 slides): Bold facts, names/times/numbers. Final: runner one-liner. Caption: hook+bullets+closer+hashtags.';
+  if(fmt==='narrative') return base+'\nFORMAT NARRATIVE (15-20 slides): Hook→context→beats→stats→close. Caption mirrors carousel.';
+  if(fmt==='gear') return base+'\nFORMAT GEAR (8-12 slides): Cover+one product per slide. Caption: observation+list+question+hashtags.';
+  if(fmt==='feature') return base+'\nFORMAT FEATURE (6 slides): Launch→history→product→quote→debut→significance. Caption: narrative flow.';
+  return base;
+}
+
+function imgCtx(){ return 'Image sourcing for Tempo Journal. For each slide: source, search term, credit line, tip. Sources: Getty/AP/Reuters (paid), Brand PR/Race org (free with credit), Unsplash (free), Athlete social (DM). Return JSON only.'; }
+
+// ── API ───────────────────────────────────────────────────────
+async function api(prompt, system, useWebSearch = false){
+  if(!API_KEY){ alert('Enter your Anthropic API key and click Save.'); throw new Error('No API key'); }
+  const body = { model: 'claude-sonnet-4-5', max_tokens: 1500, system, messages: [{ role: 'user', content: prompt }] };
+  if(useWebSearch) body.tools = [{ type: 'web_search_20250305', name: 'web_search' }];
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+    body: JSON.stringify(body)
+  });
+  if(!r.ok){ const e = await r.json(); throw new Error(e.error?.message || 'API error ' + r.status); }
+  return await r.json();
+}
+
+function extractText(data){ return (data.content || []).filter(b => b.type === 'text').map(b => b.text).join(''); }
+function extractSources(data){
+  const sources = [];
+  (data.content || []).forEach(block => {
+    if(block.type === 'tool_result' && block.content){
+      (block.content || []).forEach(c => {
+        if(c.type === 'text'){ try{ const d = JSON.parse(c.text); (d.results || []).forEach(r => { if(r.url) sources.push({ title: r.title || '', url: r.url, snippet: r.snippet || '' }); }); }catch(e){} }
+      });
+    }
+  });
+  return sources;
+}
+
+function setLd(id, msg){ document.getElementById(id).innerHTML = `<div class="loading">${msg}<span class="dots"><span></span><span></span><span></span></span></div>`; }
+
+// ── CALENDAR ─────────────────────────────────────────────────
+function pillCls(p){
+  if(!p) return '';
+  if(p.status === 'ready') return 'ready';
+  if(p.status === 'embargo') return 'embargo';
+  if(p.status === 'draft') return 'draft';
+  if(p.source === 'story') return 'story';
+  return { narrative: 'narrative', gear: 'gear', feature: 'feature' }[p.format] || 'breaking';
+}
+
+function renderCal(){
+  const g = document.getElementById('cg');
+  g.innerHTML = DAYS.map(d => `<div class="dh">${d}</div>`).join('');
+  const first = new Date(curY, curM, 1).getDay(), dim = new Date(curY, curM + 1, 0).getDate();
+  const todayKey = dk(new Date());
+  document.getElementById('ml').textContent = new Date(curY, curM).toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
+
+  for(let i = 0; i < first; i++) g.innerHTML += '<div class="dc empty"></div>';
+
+  for(let d = 1; d <= dim; d++){
+    const date = new Date(curY, curM, d), key = dk(date);
+    const post = posts[key], isSel = sel === key, isToday = key === todayKey;
+    let cls = 'dc' + (post ? ' has' : '') + (isSel ? ' sel' : '') + (isToday ? ' today' : '');
+
+    const pill = post ? `<span class="pill ${pillCls(post)}">${(post.topic || 'Story').substring(0, 20)}</span>` : `<span style="font-size:10px;color:#ddd">+</span>`;
+    const handle = post ? `<span class="drag-handle" draggable="true">⠿</span>` : '';
+
+    g.innerHTML += `<div class="${cls}" id="day-${key}" 
+      onclick="selDay('${key}')"
+      ondragover="onDragOver(event,'${key}')"
+      ondragleave="onDragLeave(event,'${key}')"
+      ondrop="onDrop(event,'${key}')">
+      <div class="dn"><span>${d}</span>${handle}</div>
+      ${pill}
+    </div>`;
+  }
+
+  // Add drag events to handles after render
+  setTimeout(() => {
+    document.querySelectorAll('.drag-handle').forEach(h => {
+      h.addEventListener('dragstart', (e) => {
+        const cell = h.closest('.dc');
+        const id = cell.id.replace('day-', '');
+        dragKey = id;
+        cell.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      h.addEventListener('dragend', () => {
+        document.querySelectorAll('.dc').forEach(c => c.classList.remove('dragging'));
+        dragKey = null;
+      });
+    });
+  }, 50);
+
+  updProg();
+}
+
+function onDragOver(e, key){
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.getElementById('day-' + key)?.classList.add('drag-over');
+}
+
+function onDragLeave(e, key){
+  document.getElementById('day-' + key)?.classList.remove('drag-over');
+}
+
+function onDrop(e, targetKey){
+  e.preventDefault();
+  document.getElementById('day-' + targetKey)?.classList.remove('drag-over');
+  if(!dragKey || dragKey === targetKey) return;
+  if(posts[targetKey]){
+    // Swap posts
+    const temp = posts[targetKey];
+    posts[targetKey] = posts[dragKey];
+    posts[dragKey] = temp;
+    setSyncLog(`↔ Swapped ${dragKey} and ${targetKey}`);
+  } else {
+    // Move post
+    posts[targetKey] = posts[dragKey];
+    delete posts[dragKey];
+    setSyncLog(`→ Moved post from ${dragKey} to ${targetKey}`);
+  }
+  if(sel === dragKey) sel = targetKey;
+  savePosts();
+  renderCal();
+}
+
+function updProg(){
+  const keys = Object.keys(posts);
+  const ready = keys.filter(k => posts[k].status === 'ready').length;
+  document.getElementById('prog').textContent = `${keys.length} posts · ${ready} ready`;
+}
+
+function prevM(){ if(--curM < 0){ curM = 11; curY--; } renderCal(); }
+function nextM(){ if(++curM > 11){ curM = 0; curY++; } renderCal(); }
+
+function selDay(key){
+  sel = key;
+  document.getElementById('dp').style.display = 'block';
+  document.getElementById('dpt').textContent = new Date(key + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
+  const fmt = posts[key]?.format || 'breaking';
+  selFmt = fmt;
+  document.querySelectorAll('.fmt-btn').forEach(b => b.classList.toggle('on', b.dataset.f === fmt));
+  loadDay(); swTab(0); showMode('generate'); renderCal();
+  document.getElementById('dp').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function closeP(){ sel = null; document.getElementById('dp').style.display = 'none'; renderCal(); }
+
+function loadDay(){
+  const post = posts[sel] || {};
+  document.getElementById('tf').textContent = post.topic || '';
+  document.getElementById('cf').textContent = post.concept || '';
+  const b = document.getElementById('sbadge'); b.textContent = post.status || 'idea'; b.className = 'sbadge ' + (post.status || 'idea');
+  if(post.carousel?.length) renCar(post.carousel, post.format);
+  else{ document.getElementById('cc').innerHTML = '<div class="es">Generate a story idea first</div>'; document.getElementById('ca').style.display = 'none'; }
+  if(post.caption) renCap(post.caption);
+  else{ document.getElementById('cap').innerHTML = '<div class="es">Generate a story idea first</div>'; document.getElementById('capa').style.display = 'none'; }
+  if(post.images?.length) renImg(post.images);
+  else{ document.getElementById('imgContent').innerHTML = '<div class="es">Generate a story idea first</div>'; document.getElementById('imgA').style.display = 'none'; }
+  if(post.sources?.length) renSources(post.sources);
+  else document.getElementById('sourcesContent').innerHTML = '<div class="es">Generate a story idea to see sources</div>';
+}
+
+function swTab(i){
+  [0,1,2,3,4].forEach(j => {
+    const el = document.getElementById('t' + j); if(el) el.style.display = j === i ? 'block' : 'none';
+    const tabs = document.querySelectorAll('#modeGeneratePanel .tab'); if(tabs[j]) tabs[j].classList.toggle('on', j === i);
+  });
+}
+
+function slLabel(i, tot, fmt){
+  if(i === 0) return 'Cover'; if(i === tot - 1) return 'Final';
+  if(fmt === 'narrative' && i >= tot - 4) return 'Stat';
+  if(fmt === 'gear') return `Item ${i}`;
+  if(fmt === 'feature') return ['Cover','Context','Product','Quote','Debut','Close'][i] || `Slide ${i+1}`;
+  return `Slide ${i+1}`;
+}
+
+function renCar(slides, fmt){ document.getElementById('cc').innerHTML = slides.map((s,i) => `<div class="sr"><span class="sb">${slLabel(i,slides.length,fmt)}</span><div class="st">${s}</div></div>`).join(''); document.getElementById('ca').style.display = 'flex'; }
+function renCap(text){ document.getElementById('cap').innerHTML = `<div class="cb" contenteditable="true" id="capTxt">${text}</div>`; document.getElementById('capa').style.display = 'flex'; }
+function bBadge(src){ const m = {'Getty':'b-getty','AP':'b-ap','Reuters':'b-ap','Brand PR':'b-brand','Race org':'b-race','Unsplash':'b-unsplash','Athlete social':'b-athlete'}; return `<span class="badge ${m[src]||'b-unsplash'}">${src}</span>`; }
+function renImg(images){
+  if(!images?.length){ document.getElementById('imgContent').innerHTML = '<div class="es">No image data</div>'; return; }
+  document.getElementById('imgContent').innerHTML = images.map((img,i) => `<div class="img-card"><div class="img-lbl">Slide ${img.slideNum||i+1}${i===0?' — Cover':''}</div><div class="img-row">${bBadge(img.source)}<div class="img-search">Search: <strong>${img.searchTerm}</strong></div></div><div class="img-credit">${img.creditLine}</div>${img.tip?`<div class="img-tip">💡 ${img.tip}</div>`:''}</div>`).join('');
+  document.getElementById('imgA').style.display = 'flex';
+}
+function renSources(sources){
+  if(!sources?.length){ document.getElementById('sourcesContent').innerHTML = '<div class="es">No sources found — verify facts manually.</div>'; return; }
+  document.getElementById('sourcesContent').innerHTML = sources.map(s => `<div class="source-card"><div class="source-title">${s.title||'Source'}</div><div class="source-url"><a href="${s.url}" target="_blank">🔗 ${s.url}</a></div>${s.snippet?`<div class="source-snippet">${s.snippet}</div>`:''}</div>`).join('');
+}
+
+// ── GENERATE DAY ─────────────────────────────────────────────
+async function genDay(type){
+  if(!sel) return;
+  const fmt = selFmt, c = brandCtx(fmt);
+  const dateStr = new Date(sel + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
+
+  if(type === 'idea' || type === 'all'){
+    setLd('tf', ''); setLd('cf', 'Searching for story ideas');
+    swTab(4); setLd('sourcesContent', 'Searching the web');
+    const hint = { breaking: 'Breaking news.', narrative: 'Long-form narrative with hyper-specific dates/names/times.', gear: 'Gear roundup.', feature: 'Brand/gear launch.' }[fmt];
+    try{
+      const data = await api(`Generate one Tempo Journal post idea for ${dateStr}. Format: ${fmt}. ${hint} Draw from: ${pillars()}. Search the web for real current running news. Return ONLY valid JSON: {"topic":"headline max 10 words","concept":"2-4 sentences with specific facts, names, times"}`, c, true);
+      const text = extractText(data);
+      const sources = extractSources(data);
+      let idea = {}; try{ idea = JSON.parse(text.replace(/```json|```/g,'').trim()); }catch{ idea = { topic: 'Running story', concept: text.substring(0, 300) }; }
+      document.getElementById('tf').textContent = idea.topic || '';
+      document.getElementById('cf').textContent = idea.concept || '';
+      if(!posts[sel]) posts[sel] = {};
+      Object.assign(posts[sel], { topic: idea.topic, concept: idea.concept, format: fmt, status: posts[sel].status || 'idea', sources });
+      renSources(sources);
+      swTab(0);
+      savePosts(); renderCal();
+    }catch(e){ document.getElementById('cf').innerHTML = `<div class="err">Error: ${e.message}</div>`; return; }
+  }
+
+  const topic = posts[sel]?.topic || document.getElementById('tf').textContent.trim();
+  const concept = posts[sel]?.concept || document.getElementById('cf').textContent.trim();
+  const pFmt = posts[sel]?.format || fmt;
+  const pCtx = brandCtx(pFmt);
+
+  if(type === 'carousel' || type === 'all'){
+    swTab(1); setLd('cc', 'Writing carousel slides');
+    const si = { breaking: 'Slide 1: bold headline. Slides 2-6: one fact. Final: runner one-liner. Return 6-8.', narrative: 'Slide 1: hook. Slides 2-4: context. Slides 5-14: beats. Slides 15-17: stats. Final: close. Return 15-18.', gear: 'Cover + one product per slide. Return 8-12.', feature: 'Launch→history→product→quote→debut→significance. Return 6.' }[pFmt];
+    try{
+      const data = await api(`Carousel slides for Tempo Journal.\nHeadline: ${topic}\nContext: ${concept}\n${si}\nReturn ONLY JSON array:\n["slide","slide",...]`, pCtx);
+      let slides = []; try{ slides = JSON.parse(extractText(data).replace(/```json|```/g,'').trim()); }catch{ slides = [topic]; }
+      renCar(slides, pFmt); posts[sel].carousel = slides; savePosts();
+    }catch(e){ document.getElementById('cc').innerHTML = `<div class="err">${e.message}</div>`; }
+  }
+
+  if(type === 'caption' || type === 'all'){
+    swTab(2); setLd('cap', 'Writing caption');
+    const ci = { breaking: 'Hook+bullets(•)+runner closer+hashtags', narrative: 'Caption mirrors carousel. Hyper-specific.', gear: 'Observation+list+question+hashtags', feature: 'Narrative flow, full quotes, no bullets' }[pFmt];
+    try{
+      const data = await api(`Instagram caption for Tempo Journal.\nHeadline: ${topic}\nContext: ${concept}\n${ci}\nReturn just the caption.`, pCtx);
+      const text = extractText(data).trim();
+      renCap(text); posts[sel].caption = text; savePosts();
+    }catch(e){ document.getElementById('cap').innerHTML = `<div class="err">${e.message}</div>`; }
+  }
+
+  if(type === 'images' || type === 'all'){
+    swTab(3); setLd('imgContent', 'Sourcing images');
+    const slides = (posts[sel]?.carousel || []).slice(0, 8).map((s,i) => `Slide ${i+1}: ${s}`).join('\n');
+    try{
+      const data = await api(`Image sourcing for Tempo Journal.\nTopic: ${topic}\nSlides:\n${slides}\nReturn ONLY JSON array (max 8):\n[{"slideNum":1,"source":"Getty|AP|Reuters|Brand PR|Race org|Unsplash|Athlete social","searchTerm":"query","creditLine":"📷 credit","tip":"optional"}]`, imgCtx());
+      let images = []; try{ images = JSON.parse(extractText(data).replace(/```json|```/g,'').trim()); }catch{}
+      renImg(images); posts[sel].images = images; savePosts();
+    }catch(e){ document.getElementById('imgContent').innerHTML = `<div class="err">${e.message}</div>`; }
+  }
+
+  updProg();
+}
+
+// ── GENERATE ALL (no web search - avoids rate limits) ─────────
+async function genAll(){
+  const btn = document.getElementById('gaBtn');
+  btn.textContent = '✕ Cancel'; btn.onclick = () => { cancelled = true; }; cancelled = false;
+  const fmts = ['breaking','breaking','breaking','narrative','breaking','gear','feature','breaking'];
+  const c = brandCtx('breaking');
+  const days = [];
+  const dim = new Date(curY, curM + 1, 0).getDate();
+  for(let d = 1; d <= dim; d++){ const key = dk(new Date(curY, curM, d)); if(!posts[key]) days.push(key); }
+  document.getElementById('genProg').style.display = 'block';
+  for(let i = 0; i < days.length; i++){
+    if(cancelled) break;
+    const key = days[i], fmt = fmts[i % fmts.length];
+    const dateStr = new Date(key + 'T00:00:00').toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+    document.getElementById('genStat').textContent = `Generating ${i+1}/${days.length}: ${dateStr} (${fmt})...`;
+    document.getElementById('pf').style.width = `${Math.round((i / days.length) * 100)}%`;
+    try{
+      const data = await api(`Generate one Tempo Journal post idea for ${dateStr}. Format: ${fmt}. Categories: ${pillars()}. Return ONLY JSON: {"topic":"headline max 10 words","concept":"2-4 sentences with specific facts"}`, c, false);
+      let idea = {}; try{ idea = JSON.parse(extractText(data).replace(/```json|```/g,'').trim()); }catch{ idea = { topic: 'Running story', concept: '' }; }
+      posts[key] = { topic: idea.topic, concept: idea.concept, format: fmt, status: 'idea' };
+      renderCal();
+      await new Promise(r => setTimeout(r, 350));
+    }catch(e){ console.log('Error on', key, e.message); }
+  }
+  document.getElementById('pf').style.width = '100%';
+  document.getElementById('genStat').textContent = cancelled ? 'Stopped.' : 'Done — click any day to generate the full post + verified sources.';
+  setTimeout(() => { document.getElementById('genProg').style.display = 'none'; }, 4000);
+  btn.textContent = '✨ Generate ideas for month'; btn.onclick = genAll;
+  savePosts(); renderCal();
+}
+
+// ── STORY INPUT ───────────────────────────────────────────────
+async function processStoryInput(){
+  const notes = document.getElementById('storyNotes').value.trim();
+  const headline = document.getElementById('storyHeadline').value.trim();
+  const fmt = document.getElementById('storyFmt').value;
+  if(!notes){ alert('Paste your story notes first.'); return; }
+  const btn = event.target.closest('button'); btn.textContent = '⏳ Processing...'; btn.disabled = true;
+  try{
+    const data = await api(`Turn these journalist notes into a Tempo Journal Instagram post.\n${headline?`Headline: ${headline}\n`:''}Format: ${fmt}\nNOTES:\n${notes}\nReturn ONLY valid JSON:\n{"slides":["slide 1",...],"caption":"caption text"}`, brandCtx(fmt) + '\nIMPORTANT: Use ONLY the provided notes. Do not invent facts.');
+    let result = {}; try{ result = JSON.parse(extractText(data).replace(/```json|```/g,'').trim()); }catch{ result = { slides: [], caption: '' }; }
+    storyResult = { slides: result.slides || [], caption: result.caption || '', fmt, headline };
+    document.getElementById('storySlides').innerHTML = (result.slides || []).map((s,i) => `<div class="sr"><span class="sb">${i===0?'Cover':`Slide ${i+1}`}</span><div class="st">${s}</div></div>`).join('');
+    document.getElementById('storyCaption').textContent = result.caption || '';
+    document.getElementById('storyOutput').style.display = 'block';
+  }catch(e){ alert('Error: ' + e.message); }
+  btn.textContent = '✨ Turn my notes into a post'; btn.disabled = false;
+}
+
+function cpStory(type){
+  const text = type === 'slides' ? (storyResult.slides || []).map((s,i) => `Slide ${i+1}: ${s}`).join('\n\n') : document.getElementById('storyCaption')?.textContent || '';
+  navigator.clipboard.writeText(text).then(() => { const btn = event.target.closest('button'), o = btn.textContent; btn.textContent = '✓ Copied!'; setTimeout(() => btn.textContent = o, 1500); });
+}
+
+function addStoryToDay(){
+  if(!sel || !storyResult.slides?.length){ alert('Generate a post first.'); return; }
+  posts[sel] = { topic: storyResult.headline || storyResult.slides[0] || 'Story', concept: '', carousel: storyResult.slides, caption: document.getElementById('storyCaption')?.textContent || storyResult.caption, format: storyResult.fmt || 'breaking', status: 'draft', source: 'story' };
+  savePosts(); renderCal(); loadDay(); showMode('generate');
+  alert('✓ Saved to this day');
+}
+
+// ── BRAND INTAKE ──────────────────────────────────────────────
+async function processBrandIntake(){
+  const pr = document.getElementById('prText').value.trim();
+  if(!pr){ alert('Paste a press release first.'); return; }
+  const btn = event.target.closest('button'); btn.textContent = '⏳ Processing...'; btn.disabled = true;
+  const handle = document.getElementById('brandHandle').value.trim() || '';
+  const embargo = document.getElementById('embargoDate').value;
+  try{
+    const data = await api(`Convert this press release into a Tempo Journal Instagram post.\nPRESS RELEASE:\n${pr}\nReturn ONLY valid JSON:\n{"slides":["slide 1",...],"caption":"caption text"}`, `You convert brand press releases into Tempo Journal Instagram posts. Cover slide: "A first look at the [Brand] [Product]". One spec per slide. Max 20 words. Tag brand${handle?' as '+handle:''}. Journalist tone, not promotional.`);
+    let result = {}; try{ result = JSON.parse(extractText(data).replace(/```json|```/g,'').trim()); }catch{ result = { slides: [], caption: '' }; }
+    brandResult = { slides: result.slides || [], caption: result.caption || '', embargo };
+    document.getElementById('brandSlides').innerHTML = (result.slides || []).map((s,i) => `<div class="sr"><span class="sb">${i===0?'Cover':`Slide ${i+1}`}</span><div class="st">${s}</div></div>`).join('');
+    document.getElementById('brandCaption').textContent = result.caption || '';
+    if(embargo){ document.getElementById('brandEmbargoNote').innerHTML = `<div style="background:#fefce8;border:1px solid #fde68a;border-radius:8px;padding:10px 12px;font-size:12px;color:#854d0e;margin-top:10px;">🔒 Embargoed until ${new Date(embargo+'T00:00:00').toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div>`; }
+    document.getElementById('brandOutput').style.display = 'block';
+  }catch(e){ alert('Error: ' + e.message); }
+  btn.textContent = '✨ Generate from press release'; btn.disabled = false;
+}
+
+function cpBrand(type){
+  const text = type === 'slides' ? (brandResult.slides || []).map((s,i) => `Slide ${i+1}: ${s}`).join('\n\n') : document.getElementById('brandCaption')?.textContent || '';
+  navigator.clipboard.writeText(text).then(() => { const btn = event.target.closest('button'), o = btn.textContent; btn.textContent = '✓ Copied!'; setTimeout(() => btn.textContent = o, 1500); });
+}
+
+function addBrandToDay(){
+  if(!sel || !brandResult.slides?.length){ alert('Generate a post first.'); return; }
+  const date = brandResult.embargo || sel;
+  posts[date] = { topic: brandResult.slides[0] || 'Brand launch', concept: '', carousel: brandResult.slides, caption: document.getElementById('brandCaption')?.textContent || brandResult.caption, format: 'feature', status: brandResult.embargo ? 'embargo' : 'draft', embargoed: !!brandResult.embargo };
+  if(brandResult.embargo){ curM = new Date(date+'T00:00:00').getMonth(); curY = new Date(date+'T00:00:00').getFullYear(); }
+  savePosts(); renderCal();
+  if(date === sel){ loadDay(); showMode('generate'); }
+  alert(`✓ Saved to ${date}`);
+}
+
+// ── UTILS ─────────────────────────────────────────────────────
+function cpText(type){
+  let text = '';
+  if(type === 'carousel') text = (posts[sel]?.carousel || []).map((s,i) => `Slide ${i+1}: ${s}`).join('\n\n');
+  else if(type === 'caption') text = document.getElementById('capTxt')?.textContent || posts[sel]?.caption || '';
+  else if(type === 'images') text = (posts[sel]?.images || []).map(img => `Slide ${img.slideNum}: ${img.creditLine} | ${img.searchTerm}`).join('\n');
+  navigator.clipboard.writeText(text).then(() => { const btn = event.target.closest('button'), o = btn.innerHTML; btn.innerHTML = '✓ Copied!'; setTimeout(() => btn.innerHTML = o, 1500); });
+}
+
+function mStat(s){
+  if(!sel || !posts[sel]) return;
+  posts[sel].status = s;
+  const b = document.getElementById('sbadge'); b.textContent = s; b.className = 'sbadge ' + s;
+  savePosts(); renderCal();
+}
+
+function clrDay(){ if(!sel) return; delete posts[sel]; savePosts(); closeP(); }
+
+async function createInCanva(){
+  if(!CANVA_KEY){ alert('Enter your Canva API token first.'); return; }
+  const post = posts[sel]; if(!post?.carousel?.length){ alert('Generate carousel slides first.'); return; }
+  if(confirm('Open your Runners Digest template in Canva?\n\nSlides:\n\n' + (post.carousel || []).map((s,i) => `Slide ${i+1}: ${s}`).join('\n'))){
+    window.open(`https://www.canva.com/design/${CANVA_TEMPLATE_ID}/edit`, '_blank');
+  }
+}
+
+function expCsv(){
+  let csv = 'Date,Format,Headline,Status,Cover Slide,Caption Preview,Sources\n';
+  Object.entries(posts).sort().forEach(([date, post]) => {
+    const srcUrls = (post.sources || []).map(s => s.url).join(' | ');
+    csv += `${date},${post.format||''},"${(post.topic||'').replace(/"/g,"'")}",${post.status||''},"${(post.carousel?.[0]||'').replace(/"/g,"'")}","${(post.caption||'').substring(0,100).replace(/"/g,"'").replace(/\n/g,' ')}","${srcUrls}"\n`;
+  });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = 'tempo-journal-content.csv'; a.click();
+}
+</script>
+</body>
+</html>
