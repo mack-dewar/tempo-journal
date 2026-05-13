@@ -225,7 +225,7 @@ h1 { font-size: 22px; font-weight: 700; margin-bottom: 2px; }
         <button class="btn small" onclick="nextM()">→</button>
       </div>
       <button class="btn small" id="gaBtn" onclick="genAll()">✨ Generate ideas for month</button>
-      <button class="btn small" onclick="expCsv()">⬇ Export CSV</button>
+      <button class="btn small" onclick="expCsv()">⬇ Export to Sheets</button>
       <span id="prog" style="font-size:12px;color:#888;margin-left:auto;"></span>
     </div>
     <div id="genProg" style="display:none;">
@@ -1048,14 +1048,71 @@ async function createInCanva(){
 }
 
 function expCsv(){
-  let csv = 'Date,Format,Headline,Status,Cover Slide,Caption Preview,Sources\n';
+  // Build headers — fixed columns + up to 20 slide columns
+  const maxSlides = Math.max(1, ...Object.values(posts).map(p => (p.carousel||[]).length));
+  const slideHeaders = Array.from({length: maxSlides}, (_,i) => `Slide ${i+1}`);
+
+  const headers = [
+    'Date',
+    'Day',
+    'Format',
+    'Status',
+    'Headline',
+    'Story Context',
+    ...slideHeaders,
+    'Total Slides',
+    'Caption',
+    'Image Credits',
+    'Verify Sources',
+    'Source URL',
+    'Last Updated'
+  ];
+
+  const rows = [headers];
+
   Object.entries(posts).sort().forEach(([date, post]) => {
-    const srcUrls = (post.sources || []).map(s => s.url).join(' | ');
-    csv += `${date},${post.format||''},"${(post.topic||'').replace(/"/g,"'")}",${post.status||''},"${(post.carousel?.[0]||'').replace(/"/g,"'")}","${(post.caption||'').substring(0,100).replace(/"/g,"'").replace(/\n/g,' ')}","${srcUrls}"\n`;
+    const d = new Date(date + 'T00:00:00');
+    const dayName = d.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const slides = post.carousel || [];
+    const slideValues = Array.from({length: maxSlides}, (_, i) => slides[i] || '');
+    const imgCredits = (post.images || []).map(img => `Slide ${img.slideNum}: ${img.creditLine}`).join('\n');
+    const sources = (post.sources || []).map(s => s.url).filter(Boolean).join('\n');
+    const sourceLinks = [
+      post.sourceUrl || '',
+      sources
+    ].filter(Boolean).join('\n');
+
+    rows.push([
+      date,
+      dayName,
+      post.format || '',
+      post.status || '',
+      post.topic || '',
+      post.concept || '',
+      ...slideValues,
+      slides.length,
+      post.caption || '',
+      imgCredits,
+      sources,
+      post.sourceUrl || '',
+      new Date().toLocaleDateString('en-AU')
+    ]);
   });
+
+  // Convert to CSV — handle multiline fields with proper quoting
+  const csv = rows.map(row =>
+    row.map(cell => {
+      const val = String(cell || '').replace(/"/g, '""');
+      // Always quote fields that might have commas, newlines or quotes
+      return `"${val}"`;
+    }).join(',')
+  ).join('\n');
+
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-  a.download = 'tempo-journal-content.csv'; a.click();
+  a.href = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' }));
+  a.download = 'tempo-journal-' + dk(new Date()) + '.csv';
+  a.click();
+  setSyncLog('✓ Full export downloaded — import into Google Sheets via File → Import');
 }
 </script>
 </body>
