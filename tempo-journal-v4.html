@@ -612,21 +612,46 @@ async function promptToPost(){
     else setSyncLog('✓ URL content loaded — using as source material');
   }
 
-  const fmt = selFmt, c = brandCtx(fmt);
-  btn.textContent = '⏳ Building post...';
+  const fmt = selFmt;
 
   try{
+    // Step 1: Use the prompt as the topic directly — no AI invention
+    const topic = prompt;
     const urlSection = urlContent ? `\n\nSOURCE MATERIAL FROM ${url}:\n${urlContent}` : '';
-    const data = await api(`You MUST write about exactly this topic: "${prompt}"${urlSection ? ' Use the source material below as your primary reference.' : ''}\n${urlSection}\n\nCreate a Tempo Journal Instagram post idea about "${prompt}". Do NOT change the topic. Do NOT write about anything else.\n\nReturn ONLY valid JSON:\n{"topic":"cover slide headline about ${prompt}, max 10 words","concept":"2-4 sentences of specific facts about ${prompt}${urlContent?' based on the source material above':''}"}`, c, false);
-    let idea = {}; try{ idea = JSON.parse(extractText(data).replace(/```json|```/g,'').trim()); }catch{ idea = { topic: prompt, concept: '' }; }
-    document.getElementById('tf').textContent = idea.topic || '';
-    document.getElementById('cf').textContent = idea.concept || '';
+
+    // Step 2: Ask AI to extract facts from URL or prompt only — strictly no invention
+    btn.textContent = '⏳ Extracting facts...';
+    const conceptData = await api(
+      `Extract key facts about this topic for a Tempo Journal Instagram post: "${prompt}"${urlSection}\n\nIMPORTANT: Only use facts from the source material provided${urlContent?` (the URL content above)`:''}. If no source material is provided, only use facts you are highly confident are accurate about "${prompt}". Do NOT invent details.\n\nReturn ONLY valid JSON:\n{"concept":"2-4 sentences of verified facts about ${prompt}. Specific names, dates, prices, specs if available."}`,
+      brandCtx(fmt), false
+    );
+    let conceptResult = {}; try{ conceptResult = JSON.parse(extractText(conceptData).replace(/```json|```/g,'').trim()); }catch{ conceptResult = { concept: prompt }; }
+
+    // Step 3: Set fields directly from prompt + extracted facts
+    document.getElementById('tf').textContent = topic;
+    document.getElementById('cf').textContent = conceptResult.concept || prompt;
     if(!posts[sel]) posts[sel] = {};
-    Object.assign(posts[sel], { topic: idea.topic, concept: idea.concept, format: fmt, slideCount, status: posts[sel].status || 'idea', sourceUrl: url || '' });
-    buildSourceLinks(prompt, idea.topic);
+    Object.assign(posts[sel], {
+      topic,
+      concept: conceptResult.concept || prompt,
+      format: fmt,
+      slideCount,
+      status: posts[sel].status || 'idea',
+      sourceUrl: url || ''
+    });
+
+    buildSourceLinks(prompt, topic);
     swTab(0);
     savePosts(); renderCal();
-    await genDay('all');
+
+    // Step 4: Generate slides, caption, images from the locked topic
+    btn.textContent = '⏳ Writing slides...';
+    await genDay('carousel');
+    btn.textContent = '⏳ Writing caption...';
+    await genDay('caption');
+    btn.textContent = '⏳ Sourcing images...';
+    await genDay('images');
+
   }catch(e){ alert('Error: ' + e.message); }
 
   btn.textContent = '→ Build post'; btn.disabled = false;
@@ -865,7 +890,9 @@ async function genDay(type){
       : 'Full documentary arc: hook → context → chronological beats → stat summary → close.';
     const si = `Write EXACTLY ${count} slide${count===1?'':'s'}. ${styleHint} Max 20 words per slide. Return EXACTLY ${count} items in the array — no more, no less.`;
     try{
-      const data = await api(`Write EXACTLY ${count} carousel slide${count===1?'':'s'} for a Tempo Journal Instagram post about: "${topic}"\n\nContext: ${concept}\n\n${styleHint}\nMax 20 words per slide. Every slide MUST be about "${topic}" — do not drift to other topics.\nReturn ONLY a JSON array with exactly ${count} strings:\n["slide 1","slide 2",...]`, pCtx);
+      const storedUrl = posts[sel]?.sourceUrl || '';
+      const storedContent = storedUrl ? '' : ''; // content was used at idea stage
+      const data = await api(`Write EXACTLY ${count} carousel slide${count===1?'':'s'} for a Tempo Journal Instagram post.\n\nTOPIC (do not change this): "${topic}"\nFACTS TO USE: ${concept}\n\n${styleHint}\nMax 20 words per slide. Stay strictly on the topic "${topic}".\nReturn ONLY a JSON array with exactly ${count} strings:\n["slide 1","slide 2",...]`, pCtx);
       let slides = []; try{ slides = JSON.parse(extractText(data).replace(/```json|```/g,'').trim()); }catch{ slides = [topic]; }
       // Enforce exact count
       while(slides.length < count) slides.push(slides[slides.length-1] || topic);
@@ -878,7 +905,7 @@ async function genDay(type){
     swTab(2); setLd('cap', 'Writing caption');
     const ci = { breaking: 'Hook+bullets(•)+runner closer+hashtags', narrative: 'Caption mirrors carousel. Hyper-specific.', gear: 'Observation+list+question+hashtags', feature: 'Narrative flow, full quotes, no bullets' }[pFmt];
     try{
-      const data = await api(`Instagram caption for Tempo Journal.\nHeadline: ${topic}\nContext: ${concept}\n${ci}\nReturn just the caption.`, pCtx);
+      const data = await api(`Write an Instagram caption for Tempo Journal.\nTOPIC (do not change): "${topic}"\nFACTS: ${concept}\n${ci}\nReturn just the caption text. Stay strictly on topic.`, pCtx);
       const text = extractText(data).trim();
       renCap(text); posts[sel].caption = text; savePosts();
     }catch(e){ document.getElementById('cap').innerHTML = `<div class="err">${e.message}</div>`; }
